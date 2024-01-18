@@ -1,0 +1,50 @@
+import multer from 'multer'
+import { v2 as cloudinary } from 'cloudinary'
+import { CloudinaryStorage } from 'multer-storage-cloudinary'
+import { StatusCodes } from 'http-status-codes' // ((狀態碼))
+
+cloudinary.config({ // ((設定雲端平台，同時在env設定以下資料))
+  cloud_name: process.env.CLOUDINARY_NAME,
+  api_key: process.env.CLOUDINARY_KEY,
+  api_secret: process.env.CLOUDINARY_SECRET
+})
+
+const upload = multer({ // (( {}內寫上傳設定 ))
+  storage: new CloudinaryStorage({ cloudinary }),
+  fileFilter (req, file, callback) { // (())
+    if (['image/jpeg', 'image/png'].includes(file.mimetype)) {
+      callback(null, true)
+    } else {
+      callback(new multer.MulterError('LIMIT_FILE_FORMAT'), false) // ((LIMIT_FILE_FORMAT 此錯誤是自訂的))
+    }
+  },
+  limits: {
+    fileSize: 1024 * 1024
+  }
+})
+
+// ((處理上傳錯誤))
+export default (req, res, next) => {
+  upload.single('image')(req, res, error => {
+    if (error instanceof multer.MulterError) { // ((instanceof 判斷東西是否為某一物件(class) ))
+      let message = '上傳錯誤'
+      if (error.code === 'LIMIT_FILE_SIZE') {
+        message = '檔案太大'
+      } else if (error.code === 'LIMIT_FILE_FORMAT') {
+        message = '檔案格式錯誤'
+      }
+      res.status(StatusCodes.BAD_REQUEST).json({
+        success: false,
+        message // (( 預設是 '上傳錯誤' :30))
+      })
+    } else if (error) {
+      console.log(error) // ((協助自己debug 可在每個 未知錯誤 或 trycatch 處 console.log(error) ))
+      res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+        success: false,
+        message: '未知錯誤'
+      })
+    } else {
+      next()
+    }
+  })
+}
